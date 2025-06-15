@@ -1,0 +1,26 @@
+{
+  "name": "Ri- Puzzle",
+  "short_name": "Ri- Puzzle",
+  "description": "AI-powered word guessing game with custom puzzles",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["games", "entertainment", "education"],
+  "lang": "en"
+}
