@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  
-  // Keep these for optimization
+  // Basic configuration for Vercel deployment
   images: {
     unoptimized: true,
   },
-  
   
   // Environment variables
   env: {
@@ -14,30 +12,9 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: '1.2.0',
   },
   
-  // Experimental features
-  experimental: {
-    optimizeCss: true,
-  },
-  
-  // Webpack configuration
-  webpack: (config, { isServer }) => {
-    // PWA optimization
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-      };
-    }
-    
-    return config;
-  },
-  
-  // Custom headers for PWA
+  // PWA headers
   async headers() {
     return [
-      // Service Worker headers
       {
         source: '/sw.js',
         headers: [
@@ -55,7 +32,6 @@ const nextConfig = {
           },
         ],
       },
-      // Manifest headers
       {
         source: '/manifest.json',
         headers: [
@@ -68,71 +44,6 @@ const nextConfig = {
             value: 'application/manifest+json',
           },
         ],
-      },
-      // Icon headers
-      {
-        source: '/icon-:size*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-          {
-            key: 'Content-Type',
-            value: 'image/png',
-          },
-        ],
-      },
-      // Security headers
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()',
-          },
-        ],
-      },
-    ];
-  },
-  
-  // Redirects
-  async redirects() {
-    return [
-      {
-        source: '/app',
-        destination: '/',
-        permanent: false,
-      },
-    ];
-  },
-  
-  // Rewrites for PWA files
-  async rewrites() {
-    return [
-      {
-        source: '/sw.js',
-        destination: '/sw.js',
-      },
-      {
-        source: '/manifest.json',
-        destination: '/manifest.json',
       },
     ];
   },
