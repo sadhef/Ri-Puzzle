@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "outputDirectory": ".next",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs"
+}
