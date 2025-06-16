@@ -99,7 +99,7 @@ function MainApp() {
               transition={{ delay: 0.4, duration: 0.8 }}
               className="mb-6 text-5xl md:text-6xl lg:text-7xl font-light leading-tight text-black dark:text-white tracking-tight"
             >
-              We Empower Businesses with{' '}
+              Smarter Puzzles,{' '}
               <motion.span
                 animate={{
                   backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
@@ -108,7 +108,7 @@ function MainApp() {
                 className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent font-medium"
                 style={{ backgroundSize: '200% 200%' }}
               >
-                Innovative AI Solutions
+                Challenge Your Mind Like Never Before
               </motion.span>
             </motion.h1>
             
