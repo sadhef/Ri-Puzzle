@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ri-Puzzle - Offline</title>
+    <title>Ri-Puzzle - You're Offline</title>
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="icon" href="/icon-192x192.png">
     <style>
         * {
             margin: 0;
@@ -12,7 +14,7 @@
         }
         
         body {
-            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -21,66 +23,112 @@
             color: white;
             text-align: center;
             padding: 20px;
+            line-height: 1.6;
         }
         
         .offline-container {
             max-width: 500px;
             width: 100%;
             background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
             padding: 40px 30px;
             border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
         }
         
-        .icon {
-            width: 80px;
-            height: 80px;
+        .icon-container {
+            width: 100px;
+            height: 100px;
             margin: 0 auto 30px;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.15);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: 50px;
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
         }
         
         h1 {
             font-size: 2.5rem;
             margin-bottom: 20px;
             font-weight: 700;
+            background: linear-gradient(45deg, #ffffff, #e0e7ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
-        p {
-            font-size: 1.1rem;
+        .subtitle {
+            font-size: 1.2rem;
             margin-bottom: 30px;
             opacity: 0.9;
-            line-height: 1.6;
+            font-weight: 500;
         }
         
-        .retry-btn {
+        .description {
+            font-size: 1rem;
+            margin-bottom: 40px;
+            opacity: 0.8;
+            line-height: 1.7;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+        
+        .btn {
             background: rgba(255, 255, 255, 0.2);
             border: 2px solid rgba(255, 255, 255, 0.3);
             color: white;
-            padding: 15px 30px;
+            padding: 15px 25px;
             border-radius: 50px;
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
             text-decoration: none;
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
         }
         
-        .retry-btn:hover {
+        .btn:hover {
             background: rgba(255, 255, 255, 0.3);
             border-color: rgba(255, 255, 255, 0.5);
             transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #3b82f6, #8b5cf6);
+            border: none;
         }
         
         .features {
-            margin-top: 40px;
             text-align: left;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 25px;
+        }
+        
+        .features h3 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            opacity: 0.9;
         }
         
         .feature {
@@ -91,16 +139,48 @@
             opacity: 0.8;
         }
         
+        .feature:last-child {
+            margin-bottom: 0;
+        }
+        
         .feature-icon {
-            width: 20px;
-            height: 20px;
+            width: 24px;
+            height: 24px;
             margin-right: 15px;
-            background: rgba(255, 255, 255, 0.3);
+            background: rgba(34, 197, 94, 0.3);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: rgba(239, 68, 68, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .status-indicator.online {
+            background: rgba(34, 197, 94, 0.9);
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
         }
         
         @media (max-width: 480px) {
@@ -110,80 +190,196 @@
             
             .offline-container {
                 padding: 30px 20px;
+                margin: 10px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
             }
         }
         
-        .pulse {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-            100% {
-                transform: scale(1);
-            }
+        .network-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            font-size: 0.85rem;
+            opacity: 0.7;
         }
     </style>
 </head>
 <body>
+    <div class="status-indicator" id="statusIndicator">
+        <span id="statusText">Offline</span>
+    </div>
+
     <div class="offline-container">
-        <div class="icon pulse">
+        <div class="icon-container pulse">
             🧩
         </div>
         
         <h1>You're Offline</h1>
+        <p class="subtitle">No internet connection detected</p>
         
-        <p>
-            No internet connection detected. Don't worry, you can still enjoy 
-            some features of Ri-Puzzle while offline!
+        <p class="description">
+            Don't worry! Ri-Puzzle works offline too. You can still enjoy 
+            word puzzles and your game progress will be saved locally.
         </p>
         
-        <button class="retry-btn" onclick="window.location.reload()">
-            Try Again
-        </button>
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="checkConnection()">
+                🔄 Check Connection
+            </button>
+            <button class="btn" onclick="goOfflineMode()">
+                📱 Play Offline
+            </button>
+        </div>
         
         <div class="features">
+            <h3>Available Offline Features</h3>
             <div class="feature">
                 <div class="feature-icon">✓</div>
-                <span>Custom word games work offline</span>
+                <span>Create and play custom word games</span>
             </div>
             <div class="feature">
                 <div class="feature-icon">✓</div>
-                <span>Your game progress is saved locally</span>
+                <span>Access your saved game progress</span>
             </div>
             <div class="feature">
                 <div class="feature-icon">✓</div>
                 <span>Settings and preferences preserved</span>
             </div>
+            <div class="feature">
+                <div class="feature-icon">✓</div>
+                <span>Full game functionality without internet</span>
+            </div>
+        </div>
+
+        <div class="network-info" id="networkInfo">
+            <div>Connection Status: <span id="connectionType">Unknown</span></div>
+            <div>Last Online: <span id="lastOnline">Unknown</span></div>
         </div>
     </div>
     
     <script>
-        // Check for connection and auto-reload when back online
-        window.addEventListener('online', () => {
-            console.log('Connection restored, reloading...');
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
-        });
+        let lastOnlineTime = localStorage.getItem('lastOnlineTime');
         
-        // Update UI based on connection status
-        function updateConnectionStatus() {
+        // Update UI elements
+        function updateUI() {
+            const statusIndicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const connectionType = document.getElementById('connectionType');
+            
             if (navigator.onLine) {
-                window.location.reload();
+                statusIndicator.className = 'status-indicator online';
+                statusText.textContent = 'Online';
+                lastOnlineTime = new Date().toLocaleString();
+                localStorage.setItem('lastOnlineTime', lastOnlineTime);
+                
+                // Auto redirect when online
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+            } else {
+                statusIndicator.className = 'status-indicator';
+                statusText.textContent = 'Offline';
+            }
+            
+            // Update connection info
+            if (navigator.connection) {
+                connectionType.textContent = navigator.connection.effectiveType || 'Unknown';
+            }
+            
+            document.getElementById('lastOnline').textContent = lastOnlineTime || 'Unknown';
+        }
+        
+        // Check connection function
+        function checkConnection() {
+            const btn = event.target;
+            btn.innerHTML = '🔄 Checking...';
+            btn.disabled = true;
+            
+            // Try to fetch a small resource
+            fetch('/', { method: 'HEAD', cache: 'no-cache' })
+                .then(() => {
+                    btn.innerHTML = '✅ Connected!';
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                })
+                .catch(() => {
+                    btn.innerHTML = '❌ Still Offline';
+                    setTimeout(() => {
+                        btn.innerHTML = '🔄 Check Connection';
+                        btn.disabled = false;
+                    }, 2000);
+                });
+        }
+        
+        // Go to offline mode
+        function goOfflineMode() {
+            // Try to navigate to cached version
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then(registration => {
+                    window.location.href = '/?offline=true';
+                });
+            } else {
+                alert('Offline mode requires service worker support. Please try updating your browser.');
             }
         }
         
-        // Check connection every 5 seconds
-        setInterval(updateConnectionStatus, 5000);
+        // Event listeners
+        window.addEventListener('online', () => {
+            console.log('🌐 Connection restored');
+            updateUI();
+        });
         
-        // Check immediately
-        updateConnectionStatus();
+        window.addEventListener('offline', () => {
+            console.log('📱 Connection lost');
+            updateUI();
+        });
+        
+        // Connection change listener
+        if (navigator.connection) {
+            navigator.connection.addEventListener('change', updateUI);
+        }
+        
+        // Periodic connection check
+        setInterval(() => {
+            if (navigator.onLine) {
+                // Double-check with actual request
+                fetch('/', { method: 'HEAD', cache: 'no-cache' })
+                    .then(() => {
+                        if (!document.hidden) {
+                            window.location.reload();
+                        }
+                    })
+                    .catch(() => {
+                        // Still offline
+                    });
+            }
+        }, 5000);
+        
+        // Initial UI update
+        updateUI();
+        
+        // Track offline page visit
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then(registration => {
+                if (registration.active) {
+                    registration.active.postMessage({
+                        type: 'OFFLINE_PAGE_VISIT',
+                        timestamp: Date.now()
+                    });
+                }
+            });
+        }
+        
+        console.log('📱 Offline page loaded. Monitoring connection...');
     </script>
 </body>
 </html>

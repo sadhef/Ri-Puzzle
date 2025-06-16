@@ -1,80 +1,82 @@
-const CACHE_NAME = 'ri-puzzle-v1.0.0';
-const STATIC_CACHE = 'ri-puzzle-static-v1.0.0';
-const DYNAMIC_CACHE = 'ri-puzzle-dynamic-v1.0.0';
+const CACHE_NAME = 'ri-puzzle-v1.2.0';
+const STATIC_CACHE = 'ri-puzzle-static-v1.2.0';
+const DYNAMIC_CACHE = 'ri-puzzle-dynamic-v1.2.0';
 
-// Assets to cache for offline functionality
+// Essential files for offline functionality
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
+  '/offline.html',
   '/icon-192x192.png',
   '/icon-512x512.png',
-  '/offline.html',
-  // Add your main CSS and JS files here
-  '/_next/static/css/app.css',
-  '/_next/static/chunks/main.js',
-  // Fonts
-  'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap'
+  '/favicon.ico'
 ];
 
-// Network-first resources (like API calls)
+// Skip these patterns during fetch interception
+const SKIP_PATTERNS = [
+  '/api/',
+  '/_next/webpack-hmr',
+  '/_next/static/webpack/',
+  'chrome-extension://',
+  'moz-extension://',
+  'safari-extension://'
+];
+
+// Network-first resources
 const NETWORK_FIRST = [
   '/api/',
-  'https://generativelanguage.googleapis.com/'
+  'https://generativelanguage.googleapis.com/',
+  'https://fonts.googleapis.com/',
+  'https://fonts.gstatic.com/'
 ];
 
-// Cache-first resources (static assets)
-const CACHE_FIRST = [
-  '/_next/',
-  '/static/',
-  '/images/',
-  '/icons/',
-  'https://fonts.gstatic.com/',
-  'https://fonts.googleapis.com/'
-];
-
-// Install event - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('Service Worker: Installing...');
+  console.log('🔧 SW: Installing version', CACHE_NAME);
+  
+  event.waitUntil(
+    caches.open(STATIC_CACHE)
+      .then((cache) => {
+        console.log('📦 SW: Caching static assets');
+        return cache.addAll(STATIC_ASSETS.filter(url => url !== '/'));
+      })
+      .then(() => {
+        console.log('✅ SW: Installation complete');
+        return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('❌ SW: Installation failed:', error);
+      })
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('🚀 SW: Activating version', CACHE_NAME);
   
   event.waitUntil(
     Promise.all([
-      caches.open(STATIC_CACHE).then((cache) => {
-        console.log('Service Worker: Caching static assets');
-        return cache.addAll(STATIC_ASSETS);
+      // Clear old caches
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter(cacheName => 
+              cacheName.startsWith('ri-puzzle-') && 
+              cacheName !== STATIC_CACHE && 
+              cacheName !== DYNAMIC_CACHE
+            )
+            .map(cacheName => {
+              console.log('🗑️ SW: Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
       }),
-      caches.open(DYNAMIC_CACHE).then((cache) => {
-        console.log('Service Worker: Dynamic cache initialized');
-        return cache;
-      })
+      // Take control of all clients
+      self.clients.claim()
     ]).then(() => {
-      console.log('Service Worker: Installation complete');
-      return self.skipWaiting();
+      console.log('✅ SW: Activation complete');
     })
   );
 });
 
-// Activate event - clean up old caches
-self.addEventListener('activate', (event) => {
-  console.log('Service Worker: Activating...');
-  
-  event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
-            console.log('Service Worker: Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => {
-      console.log('Service Worker: Activation complete');
-      return self.clients.claim();
-    })
-  );
-});
-
-// Fetch event - handle requests with different strategies
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -84,108 +86,88 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first strategy for API calls
-  if (NETWORK_FIRST.some(pattern => request.url.includes(pattern))) {
-    event.respondWith(networkFirst(request));
+  // Skip certain patterns
+  if (SKIP_PATTERNS.some(pattern => request.url.includes(pattern))) {
     return;
   }
 
-  // Cache-first strategy for static assets
-  if (CACHE_FIRST.some(pattern => request.url.includes(pattern))) {
-    event.respondWith(cacheFirst(request));
-    return;
-  }
-
-  // Stale-while-revalidate for pages
+  // Handle different request types
   if (request.destination === 'document') {
-    event.respondWith(staleWhileRevalidate(request));
-    return;
+    event.respondWith(handlePageRequest(request));
+  } else if (NETWORK_FIRST.some(pattern => request.url.includes(pattern))) {
+    event.respondWith(handleNetworkFirst(request));
+  } else {
+    event.respondWith(handleCacheFirst(request));
   }
-
-  // Default: cache-first for everything else
-  event.respondWith(cacheFirst(request));
 });
 
-// Network-first strategy
-async function networkFirst(request) {
+// Handle page requests with network-first, fallback to cache, then offline page
+async function handlePageRequest(request) {
   try {
     const networkResponse = await fetch(request);
-    
     if (networkResponse.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
+      return networkResponse;
     }
-    
-    return networkResponse;
+    throw new Error('Network response not ok');
   } catch (error) {
-    console.log('Network failed, trying cache:', error);
-    const cachedResponse = await caches.match(request);
+    console.log('📄 SW: Network failed for page, trying cache:', request.url);
     
+    const cachedResponse = await caches.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
     
-    // Return offline page for navigation requests
-    if (request.destination === 'document') {
-      return caches.match('/offline.html');
+    // Return offline page as fallback
+    console.log('📱 SW: Returning offline page');
+    return caches.match('/offline.html') || new Response('Offline', { status: 503 });
+  }
+}
+
+// Network-first strategy
+async function handleNetworkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok && networkResponse.status < 400) {
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, networkResponse.clone());
     }
-    
+    return networkResponse;
+  } catch (error) {
+    console.log('🌐 SW: Network failed, trying cache:', request.url);
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
     throw error;
   }
 }
 
 // Cache-first strategy
-async function cacheFirst(request) {
+async function handleCacheFirst(request) {
   const cachedResponse = await caches.match(request);
-  
   if (cachedResponse) {
     return cachedResponse;
   }
   
   try {
     const networkResponse = await fetch(request);
-    
-    if (networkResponse.ok) {
+    if (networkResponse.ok && networkResponse.status < 400) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());
     }
-    
     return networkResponse;
   } catch (error) {
-    console.log('Cache and network failed:', error);
-    
-    // Return offline page for navigation requests
-    if (request.destination === 'document') {
-      return caches.match('/offline.html');
-    }
-    
+    console.log('💾 SW: Both cache and network failed:', request.url);
     throw error;
   }
 }
 
-// Stale-while-revalidate strategy
-async function staleWhileRevalidate(request) {
-  const cachedResponse = await caches.match(request);
-  
-  const fetchPromise = fetch(request).then((networkResponse) => {
-    if (networkResponse.ok) {
-      const cache = caches.open(DYNAMIC_CACHE);
-      cache.then(c => c.put(request, networkResponse.clone()));
-    }
-    return networkResponse;
-  }).catch(() => {
-    // If network fails and we have no cache, return offline page
-    if (!cachedResponse && request.destination === 'document') {
-      return caches.match('/offline.html');
-    }
-    throw new Error('Both cache and network failed');
-  });
-  
-  return cachedResponse || fetchPromise;
-}
-
-// Background sync for game data
+// Background sync
 self.addEventListener('sync', (event) => {
+  console.log('🔄 SW: Background sync triggered:', event.tag);
+  
   if (event.tag === 'game-data-sync') {
     event.waitUntil(syncGameData());
   }
@@ -193,59 +175,102 @@ self.addEventListener('sync', (event) => {
 
 async function syncGameData() {
   try {
-    // Sync any pending game data when back online
-    console.log('Service Worker: Syncing game data...');
-    // Add your sync logic here
+    console.log('📊 SW: Syncing game data...');
+    // Add your game data sync logic here
+    const gameData = await getStoredGameData();
+    if (gameData && gameData.length > 0) {
+      // Sync with server when online
+      await fetch('/api/sync-game-data', {
+        method: 'POST',
+        body: JSON.stringify(gameData),
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
   } catch (error) {
-    console.error('Service Worker: Game data sync failed:', error);
+    console.error('❌ SW: Game data sync failed:', error);
   }
 }
 
-// Push notification handler
+async function getStoredGameData() {
+  // This would get data from IndexedDB or other storage
+  return [];
+}
+
+// Push notifications
 self.addEventListener('push', (event) => {
+  console.log('🔔 SW: Push notification received');
+  
+  const options = {
+    body: 'New puzzle available!',
+    icon: '/icon-192x192.png',
+    badge: '/icon-96x96.png',
+    vibrate: [200, 100, 200],
+    data: { url: '/' },
+    actions: [
+      { action: 'open', title: 'Play Now' },
+      { action: 'dismiss', title: 'Later' }
+    ]
+  };
+
   if (event.data) {
-    const data = event.data.json();
-    
-    const options = {
-      body: data.body || 'You have a new notification!',
-      icon: '/icon-192x192.png',
-      badge: '/icon-96x96.png',
-      vibrate: [200, 100, 200],
-      data: data.data || {},
-      actions: [
-        {
-          action: 'open',
-          title: 'Open Game'
-        },
-        {
-          action: 'close',
-          title: 'Close'
-        }
-      ]
-    };
-    
-    event.waitUntil(
-      self.registration.showNotification(data.title || 'Ri-Puzzle', options)
-    );
+    try {
+      const data = event.data.json();
+      Object.assign(options, data);
+    } catch (e) {
+      options.body = event.data.text();
+    }
   }
+
+  event.waitUntil(
+    self.registration.showNotification('Ri-Puzzle', options)
+  );
 });
 
-// Notification click handler
+// Notification clicks
 self.addEventListener('notificationclick', (event) => {
+  console.log('👆 SW: Notification clicked');
   event.notification.close();
-  
+
   if (event.action === 'open' || !event.action) {
     event.waitUntil(
-      clients.openWindow('/')
+      clients.matchAll({ type: 'window' }).then((clientList) => {
+        // Check if app is already open
+        for (const client of clientList) {
+          if (client.url.includes(self.registration.scope) && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Open new window if not already open
+        if (clients.openWindow) {
+          return clients.openWindow('/');
+        }
+      })
     );
   }
 });
 
-// Handle app shortcuts
+// Handle messages from main thread
 self.addEventListener('message', (event) => {
+  console.log('💬 SW: Message received:', event.data);
+  
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+    // Notify clients about the update
+    self.clients.matchAll().then((clients) => {
+      clients.forEach((client) => {
+        client.postMessage({ type: 'SW_UPDATED' });
+      });
+    });
   }
 });
 
-console.log('Service Worker: Loaded successfully');
+// Error handling
+self.addEventListener('error', (event) => {
+  console.error('❌ SW: Error occurred:', event.error);
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  console.error('❌ SW: Unhandled promise rejection:', event.reason);
+});
+
+console.log('✅ SW: Service Worker loaded successfully');
