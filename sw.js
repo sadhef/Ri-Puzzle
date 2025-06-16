@@ -1,225 +1,251 @@
 const CACHE_NAME = 'ri-puzzle-v1.0.0';
-const STATIC_CACHE_NAME = 'ri-puzzle-static-v1.0.0';
-const DYNAMIC_CACHE_NAME = 'ri-puzzle-dynamic-v1.0.0';
+const STATIC_CACHE = 'ri-puzzle-static-v1.0.0';
+const DYNAMIC_CACHE = 'ri-puzzle-dynamic-v1.0.0';
 
-// Assets to cache on install
+// Assets to cache for offline functionality
 const STATIC_ASSETS = [
   '/',
+  '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
-  '/manifest.json',
-  '/offline.html'
+  '/offline.html',
+  // Add your main CSS and JS files here
+  '/_next/static/css/app.css',
+  '/_next/static/chunks/main.js',
+  // Fonts
+  'https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap'
+];
+
+// Network-first resources (like API calls)
+const NETWORK_FIRST = [
+  '/api/',
+  'https://generativelanguage.googleapis.com/'
+];
+
+// Cache-first resources (static assets)
+const CACHE_FIRST = [
+  '/_next/',
+  '/static/',
+  '/images/',
+  '/icons/',
+  'https://fonts.gstatic.com/',
+  'https://fonts.googleapis.com/'
 ];
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
+  
   event.waitUntil(
-    caches.open(STATIC_CACHE_NAME)
-      .then((cache) => {
+    Promise.all([
+      caches.open(STATIC_CACHE).then((cache) => {
         console.log('Service Worker: Caching static assets');
         return cache.addAll(STATIC_ASSETS);
+      }),
+      caches.open(DYNAMIC_CACHE).then((cache) => {
+        console.log('Service Worker: Dynamic cache initialized');
+        return cache;
       })
-      .then(() => {
-        console.log('Service Worker: Static assets cached');
-        return self.skipWaiting();
-      })
-      .catch((error) => {
-        console.error('Service Worker: Failed to cache static assets', error);
-      })
+    ]).then(() => {
+      console.log('Service Worker: Installation complete');
+      return self.skipWaiting();
+    })
   );
 });
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('Service Worker: Activating...');
+  
   event.waitUntil(
-    caches.keys()
-      .then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => {
-            if (cacheName !== STATIC_CACHE_NAME && cacheName !== DYNAMIC_CACHE_NAME) {
-              console.log('Service Worker: Deleting old cache', cacheName);
-              return caches.delete(cacheName);
-            }
-          })
-        );
-      })
-      .then(() => {
-        console.log('Service Worker: Activated');
-        return self.clients.claim();
-      })
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== STATIC_CACHE && cacheName !== DYNAMIC_CACHE) {
+            console.log('Service Worker: Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => {
+      console.log('Service Worker: Activation complete');
+      return self.clients.claim();
+    })
   );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - handle requests with different strategies
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const { url, method } = request;
+  const url = new URL(request.url);
 
-  // Only handle GET requests
-  if (method !== 'GET') return;
-
-  // Handle navigation requests
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful navigation responses
-          if (response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(DYNAMIC_CACHE_NAME)
-              .then((cache) => cache.put(request, responseClone));
-          }
-          return response;
-        })
-        .catch(() => {
-          // Serve offline page for navigation requests
-          return caches.match('/offline.html');
-        })
-    );
+  // Skip non-GET requests
+  if (request.method !== 'GET') {
     return;
   }
 
-  // Handle API requests (like Gemini AI)
-  if (url.includes('generativelanguage.googleapis.com')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Don't cache API responses, always fetch fresh
-          return response;
-        })
-        .catch(() => {
-          // Return null for failed API requests - let the app handle fallbacks
-          return new Response(
-            JSON.stringify({ error: 'Offline - using fallback' }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          );
-        })
-    );
+  // Network-first strategy for API calls
+  if (NETWORK_FIRST.some(pattern => request.url.includes(pattern))) {
+    event.respondWith(networkFirst(request));
     return;
   }
 
-  // Handle static assets (cache first)
-  if (url.includes('.js') || url.includes('.css') || url.includes('.png') || 
-      url.includes('.jpg') || url.includes('.svg') || url.includes('.ico')) {
-    event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          return fetch(request)
-            .then((response) => {
-              // Cache successful responses
-              if (response.status === 200) {
-                const responseClone = response.clone();
-                caches.open(STATIC_CACHE_NAME)
-                  .then((cache) => cache.put(request, responseClone));
-              }
-              return response;
-            });
-        })
-        .catch(() => {
-          // For images, return a placeholder
-          if (url.includes('.png') || url.includes('.jpg') || url.includes('.svg')) {
-            return new Response(
-              '<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="200" fill="#f3f4f6"/><text x="100" y="100" text-anchor="middle" dy=".3em" fill="#9ca3af">Image Offline</text></svg>',
-              { headers: { 'Content-Type': 'image/svg+xml' } }
-            );
-          }
-          return caches.match('/offline.html');
-        })
-    );
+  // Cache-first strategy for static assets
+  if (CACHE_FIRST.some(pattern => request.url.includes(pattern))) {
+    event.respondWith(cacheFirst(request));
     return;
   }
 
-  // Default: network first, then cache
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        // Cache successful responses
-        if (response.status === 200) {
-          const responseClone = response.clone();
-          caches.open(DYNAMIC_CACHE_NAME)
-            .then((cache) => cache.put(request, responseClone));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(request)
-          .then((cachedResponse) => {
-            return cachedResponse || caches.match('/offline.html');
-          });
-      })
-  );
+  // Stale-while-revalidate for pages
+  if (request.destination === 'document') {
+    event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  // Default: cache-first for everything else
+  event.respondWith(cacheFirst(request));
 });
 
-// Handle background sync for offline actions
+// Network-first strategy
+async function networkFirst(request) {
+  try {
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Network failed, trying cache:', error);
+    const cachedResponse = await caches.match(request);
+    
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
+    // Return offline page for navigation requests
+    if (request.destination === 'document') {
+      return caches.match('/offline.html');
+    }
+    
+    throw error;
+  }
+}
+
+// Cache-first strategy
+async function cacheFirst(request) {
+  const cachedResponse = await caches.match(request);
+  
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  try {
+    const networkResponse = await fetch(request);
+    
+    if (networkResponse.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, networkResponse.clone());
+    }
+    
+    return networkResponse;
+  } catch (error) {
+    console.log('Cache and network failed:', error);
+    
+    // Return offline page for navigation requests
+    if (request.destination === 'document') {
+      return caches.match('/offline.html');
+    }
+    
+    throw error;
+  }
+}
+
+// Stale-while-revalidate strategy
+async function staleWhileRevalidate(request) {
+  const cachedResponse = await caches.match(request);
+  
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse.ok) {
+      const cache = caches.open(DYNAMIC_CACHE);
+      cache.then(c => c.put(request, networkResponse.clone()));
+    }
+    return networkResponse;
+  }).catch(() => {
+    // If network fails and we have no cache, return offline page
+    if (!cachedResponse && request.destination === 'document') {
+      return caches.match('/offline.html');
+    }
+    throw new Error('Both cache and network failed');
+  });
+  
+  return cachedResponse || fetchPromise;
+}
+
+// Background sync for game data
 self.addEventListener('sync', (event) => {
-  console.log('Service Worker: Background sync', event.tag);
-  
-  if (event.tag === 'background-sync') {
+  if (event.tag === 'game-data-sync') {
+    event.waitUntil(syncGameData());
+  }
+});
+
+async function syncGameData() {
+  try {
+    // Sync any pending game data when back online
+    console.log('Service Worker: Syncing game data...');
+    // Add your sync logic here
+  } catch (error) {
+    console.error('Service Worker: Game data sync failed:', error);
+  }
+}
+
+// Push notification handler
+self.addEventListener('push', (event) => {
+  if (event.data) {
+    const data = event.data.json();
+    
+    const options = {
+      body: data.body || 'You have a new notification!',
+      icon: '/icon-192x192.png',
+      badge: '/icon-96x96.png',
+      vibrate: [200, 100, 200],
+      data: data.data || {},
+      actions: [
+        {
+          action: 'open',
+          title: 'Open Game'
+        },
+        {
+          action: 'close',
+          title: 'Close'
+        }
+      ]
+    };
+    
     event.waitUntil(
-      // Handle any offline actions that need to be synced
-      console.log('Service Worker: Syncing background data')
+      self.registration.showNotification(data.title || 'Ri-Puzzle', options)
     );
   }
 });
 
-// Handle push notifications (future feature)
-self.addEventListener('push', (event) => {
-  console.log('Service Worker: Push notification received', event);
-  
-  const options = {
-    body: event.data ? event.data.text() : 'New challenge available!',
-    icon: '/icon-192x192.png',
-    badge: '/icon-72x72.png',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: 1
-    },
-    actions: [
-      {
-        action: 'explore',
-        title: 'Play Now',
-        icon: '/icon-192x192.png'
-      },
-      {
-        action: 'close',
-        title: 'Close',
-        icon: '/icon-192x192.png'
-      }
-    ]
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification('Ri-Puzzle', options)
-  );
-});
-
-// Handle notification clicks
+// Notification click handler
 self.addEventListener('notificationclick', (event) => {
-  console.log('Service Worker: Notification click received', event);
-  
   event.notification.close();
   
-  if (event.action === 'explore') {
+  if (event.action === 'open' || !event.action) {
     event.waitUntil(
       clients.openWindow('/')
     );
   }
 });
 
-// Handle messages from the main thread
+// Handle app shortcuts
 self.addEventListener('message', (event) => {
-  console.log('Service Worker: Message received', event.data);
-  
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
+
+console.log('Service Worker: Loaded successfully');
